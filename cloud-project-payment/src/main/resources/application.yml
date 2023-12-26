@@ -14,7 +14,7 @@ spring:
 mybatis:
   config-location: classpath:mybatis-config.xml
   mapperLocation: classpath:mapper/*.xml
-  type-aliases-package: com.atguigu.springcloud.entities
+  type-aliases-package: org.ilearn.springcloud.entities
 
 
 

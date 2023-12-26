@@ -1,7 +1,7 @@
-package com.atguigu.springcloud.service;
+package org.ilearn.springcloud.service;
 
-import com.atguigu.springcloud.dao.PaymentDao;
-import com.atguigu.springcloud.entities.Payment;
+import org.ilearn.springcloud.entities.Payment;
+import org.ilearn.springcloud.dao.PaymentDao;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 

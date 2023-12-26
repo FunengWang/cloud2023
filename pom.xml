@@ -2,12 +2,14 @@
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>com.atguigu.springcloud</groupId>
+  <groupId>org.ilearn.springcloud</groupId>
   <artifactId>cloud2023</artifactId>
   <version>1.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <modules>
     <module>cloud-project-payment</module>
+    <module>cloud-project-order</module>
+    <module>cloud-api-commons</module>
   </modules>
 
   <properties>
@@ -23,6 +25,7 @@
     <spring-cloud.version>Hoxton.SR1</spring-cloud.version>
     <spring-boot.version>2.2.2.RELEASE</spring-boot.version>
     <spring-cloud-alibaba.version>2.1.0.RELEASE</spring-cloud-alibaba.version>
+    <project.version>1.0-SNAPSHOT</project.version>
   </properties>
 
   <dependencyManagement>
@@ -64,10 +67,17 @@
           <version>${druid.version}</version>
         </dependency>
 
+
         <dependency>
           <groupId>org.mybatis.spring.boot</groupId>
           <artifactId>mybatis-spring-boot-starter</artifactId>
           <version>${mybatis.spring.boot.version}</version>
+        </dependency>
+
+        <dependency>
+          <groupId>org.ilearn.springcloud</groupId>
+          <artifactId>cloud-api-commons</artifactId>
+          <version>${project.version}</version>
         </dependency>
       </dependencies>
   </dependencyManagement>

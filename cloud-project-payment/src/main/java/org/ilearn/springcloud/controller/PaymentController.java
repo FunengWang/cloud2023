@@ -1,19 +1,20 @@
-package com.atguigu.springcloud.controller;
+package org.ilearn.springcloud.controller;
 
-import com.atguigu.springcloud.entities.CommonResult;
-import com.atguigu.springcloud.entities.Payment;
-import com.atguigu.springcloud.service.PaymentService;
+import org.ilearn.springcloud.entities.CommonResult;
+import org.ilearn.springcloud.entities.Payment;
+import org.ilearn.springcloud.service.PaymentService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
+@RequestMapping("/payment")
 @Slf4j
 public class PaymentController {
     @Autowired
     private PaymentService paymentService;
 
-    @PostMapping("/payment/create")
+    @PostMapping("/create")
     public CommonResult<Integer> create(@RequestBody Payment payment){
         int result = paymentService.create(payment);
         log.info("insert a record :"+result);
@@ -25,7 +26,7 @@ public class PaymentController {
         }
     }
 
-    @GetMapping("/payment/get/{id}")
+    @GetMapping("/get/{id}")
     public CommonResult<Payment> getPaymentById(@PathVariable("id") Long id){
         Payment payment   = paymentService.getPaymentById(id);
         log.info("query result: "+payment);
