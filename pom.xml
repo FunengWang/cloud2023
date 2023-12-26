@@ -11,6 +11,8 @@
     <module>cloud-project-order</module>
     <module>cloud-api-commons</module>
     <module>cloud-eureka-server</module>
+    <module>cloud-eureka-server-backup</module>
+    <module>cloud-project-payment-backup</module>
   </modules>
 
   <properties>
