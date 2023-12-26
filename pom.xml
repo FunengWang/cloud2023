@@ -10,6 +10,7 @@
     <module>cloud-project-payment</module>
     <module>cloud-project-order</module>
     <module>cloud-api-commons</module>
+    <module>cloud-eureka-server</module>
   </modules>
 
   <properties>
