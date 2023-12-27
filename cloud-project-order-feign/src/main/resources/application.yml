@@ -16,5 +16,11 @@ eureka:
       defaultZone: http://eureka7001.com:7001/eureka/,http://eureka7002.com:7002/eureka/
 
 ribbon:
+  #default timeout is 1s
   ReadTimeout: 5000
   ConnectTimeout: 5000
+
+logging:
+  level:
+    # feign logger monitors which service at which level
+    org.ilearn.springcloud.service.PaymentFeignService: debug
