@@ -12,4 +12,5 @@ public class PaymentHystrixApplication {
     public static void main( String[] args ) {
         SpringApplication.run(PaymentHystrixApplication.class,args);
     }
+
 }

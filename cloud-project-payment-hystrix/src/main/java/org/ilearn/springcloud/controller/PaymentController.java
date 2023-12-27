@@ -30,4 +30,9 @@ public class PaymentController {
         return result;
     }
 
+    @GetMapping("/hystrix/breaker/{id}")
+    public String circuitBreaker(@PathVariable("id")Integer id){
+        return paymentService.paymentCircuitBreaker(id);
+    }
+
 }
