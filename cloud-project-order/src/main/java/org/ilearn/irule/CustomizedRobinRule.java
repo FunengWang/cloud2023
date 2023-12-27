@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Configuration;
 public class CustomizedRobinRule {
     @Bean
     public IRule myRule(){
-        //default rule is Round-robbin
+        //default rule is Round-robbin, here switch to random rule
         return new RandomRule();
     }
 }
