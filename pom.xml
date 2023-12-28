@@ -17,6 +17,7 @@
     <module>cloud-project-payment-hystrix</module>
       <module>cloud-project-order-hystrix</module>
       <module>cloud-hystrix-dashboard</module>
+    <module>cloud-gateway</module>
   </modules>
 
   <properties>

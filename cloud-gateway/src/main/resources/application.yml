@@ -1,0 +1,52 @@
+server:
+  port: 9527
+
+spring:
+  application:
+    name: cloud-gateway
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true #create dynamic routes through eureka server
+      routes:
+        - id: payment_routh #route's ID, no fixed rule, ID should be unique, suggest use service name as prefix
+#          uri: http://localhost:8001
+          uri: lb://cloud-payment-service
+          predicates:
+            - Path=/payment/get/**
+        - id: payment_routh2
+#          uri: http://localhost:8001
+          uri: lb://cloud-payment-service
+          predicates:
+            - Path=/payment/create/**
+#            - After=2023-12-28T14:43:46.917+08:00[Asia/Shanghai]
+#            - Before=2023-12-28T14:43:46.917+08:00[Asia/Shanghai]
+#            - Between=2023-12-28T14:43:46.917+08:00[Asia/Shanghai],2023-12-29T14:43:46.917+08:00[Asia/Shanghai]
+#            - Cookie=key,value
+#            - Header=X-request-Id, \d+ #first param is header name, second param is reg expression
+#            - Host=**.somehost.org,**.anotherhost.org
+#            - Method=GET,POST #this route matches if the request method was a GET or a POST
+#            - Query=red, gree.  #The  route matches if the request contained a red query parameter whose value matched the gree. regexp, so green and greet would match.
+#            - RemoteAddr=192.168.1.1/24 #This route matches if the remote address of the request was, for example, 192.168.1.10.
+
+#          This route would forward ~80% of traffic to weighthigh.org and ~20% of traffic to weighlow.org
+#            routes:
+#              - id: weight_high
+#                uri: https://weighthigh.org
+#                predicates:
+#                  - Weight=group1, 8
+#              - id: weight_low
+#                uri: https://weightlow.org
+#                predicates:
+#                  - Weight=group1, 2
+
+eureka:
+  instance:
+   # hostname: cloud-gateway-service
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      #defaultZone: http://eureka7001.com:7001/eureka/,http://eureka7002.com:7002/eureka/
+      defaultZone: http://eureka7001.com:7001/eureka/
