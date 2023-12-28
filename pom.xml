@@ -20,6 +20,8 @@
     <module>cloud-gateway</module>
       <module>cloud-config-server</module>
       <module>cloud-config-client</module>
+      <module>cloud-stream-publisher</module>
+    <module>cloud-stream-receiver</module>
   </modules>
 
   <properties>
