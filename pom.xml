@@ -18,6 +18,8 @@
       <module>cloud-project-order-hystrix</module>
       <module>cloud-hystrix-dashboard</module>
     <module>cloud-gateway</module>
+      <module>cloud-config-sever</module>
+      <module>cloud-config-client</module>
   </modules>
 
   <properties>

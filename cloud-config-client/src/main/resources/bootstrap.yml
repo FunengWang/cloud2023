@@ -1,0 +1,27 @@
+server:
+  port: 3355
+
+spring:
+  application:
+    name: config-client
+  cloud:
+    config:
+      label: master #branch name
+      name: config-client #name of config file
+      profile: dev #suffix of config file, config-client-dev.yml/.properties in master branch will be loaded
+      uri: http://localhost:3344
+
+eureka:
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      #defaultZone: http://eureka7001.com:7001/eureka/,http://eureka7002.com:7002/eureka/
+      defaultZone: http://eureka7001.com:7001/eureka/
+
+#expose monitor endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
