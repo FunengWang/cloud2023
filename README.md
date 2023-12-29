@@ -291,19 +291,475 @@ public class OrderController {
 No extra config on provider side.
 
 ## Service Consumer
+The feature of OpenFeign is that we only need to declare an interface, OpenFeign creates dynamic implementation of the interface automatically for us
+
+```java
+@SpringBootApplication
+@EnableFeignClients //this annotation is required
+public class OrderFeignApplication {
+    public static void main( String[] args ) {
+        SpringApplication.run(OrderFeignApplication.class,args);
+    }
+}
+```
+```java
+@Component
+@FeignClient(value = "CLOUD-PAYMENT-SERVICE")
+//declare service provider's name
+public interface PaymentFeignService {
+    @GetMapping("/payment/get/{id}")
+    CommonResult<Payment> getPaymentById(@PathVariable("id") Long id);
+
+    @GetMapping("/payment/feign/timeout")
+    String paymentTimeout();
+}
+```
+```java
+@Configuration
+public class FeignConfig {
+    @Bean
+    Logger.Level feignLoggerLevel(){
+        //set the logger level to full, we can view most details
+        return Logger.Level.FULL;
+    }
+}
+```
+`application.yml`
+```yml
+ribbon:
+  #default timeout is 1s, we will use read time out in later session:Hystrix
+  ReadTimeout: 5000
+  ConnectTimeout: 5000
+logging:
+  level:
+    # feign logger monitors which service at which level
+    org.ilearn.springcloud.service.PaymentFeignService: debug
+```
+
+# Netflix Hystrix
+The features of Hystrix are Service Fallback and Circuit Breaker.
+
+**Notice:eureka server instances are required to be in running state before moving on.**
+
+| Module Name                   | Service Provider/Consumer | service name                | port |
+|-------------------------------|---------------------------|-----------------------------|------|
+| cloud-project-order-hystrix   | Service Consumer          | cloud-order-service-hystrix | 80   |
+| cloud-project-payment-hystrix | Service Provider          | cloud-payment-service       | 8001 |
+| cloud-hystrix-dashboard       | N/A                       | N/A                         | 9001 |
+
+## Service Fallback
+### Fallback on Service Provider
+The common two reasons of Service Fallback on Service Provider are Runtime Exception and Time Out.
+
+`PaymentHystrixApplication.java`
+```java
+@SpringBootApplication
+@EnableEurekaClient
+@EnableCircuitBreaker //required annotation
+public class PaymentHystrixApplication {
+    public static void main( String[] args ) {
+        SpringApplication.run(PaymentHystrixApplication.class,args);
+    }
+}
+```
+We have two methods to set up fallback. One is to add `@HystrixCommand` on given method, set up fallback for given service.
+Another is to add `@HystrixCommand` on `PaymentService`, which set tp a global fallback.
+Actually, we have a better method to set up fallback, we can decouple service logic and fallback logic, you will view it in the later session.
+
+```java
+@Service
+@DefaultProperties(defaultFallback = "globalFallBack")
+public class PaymentService {
+    /**
+     * Mock a simple healthy service
+     */
+    public String ok(Integer id) {
+        return "Ok service returns the result： "+id;
+    }
+
+    /**
+     * Mock a time-consuming service
+     */
+    @HystrixCommand(fallbackMethod = "timeoutHandler", commandProperties = {
+            @HystrixProperty(name = "execution.isolation.thread.timeoutInMilliseconds",value = "5000")
+    })
+    public String timeout(Integer id) {
+        try {
+            TimeUnit.SECONDS.sleep(3);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+//        int age = 2/0;
+        return "Timeout service returns the result : "+id;
+    }
+
+    public String timeoutHandler(Integer id) {
+        return "Payment service is going through an extreme high volume of request or encountered an unexpected exception. Please invoke later.";
+    }
+
+    public String globalFallBack(){
+        return "Current service is going through an extreme high volume of request or encountered an unexpected exception. Please invoke later.";
+    }
+}
+```
+
+### Fallback on Service Consumer
+You can see the difference of fallback configuration on Service Consumer.
+
+```java
+@SpringBootApplication
+@EnableFeignClients
+@EnableHystrix //different annotation with Service Consumer side
+public class OrderHystrixApplication {
+    public static void main( String[] args ) {
+        SpringApplication.run(OrderHystrixApplication.class,args);
+    }
+}
+```
+
+```yml
+feign:
+  hystrix:
+    enabled: true
+```
+We decoupled service logic and fallback logic perfectly in this way.
+```java
+@Component
+@FeignClient(name = "CLOUD-PAYMENT-SERVICE-HYSTRIX",fallback = PaymentFallBackService.class)
+public interface PaymentHystrixService {
+    @GetMapping("/payment/hystrix/ok/{id}")
+     String ok(@PathVariable("id")Integer id);
+    @GetMapping("/payment/hystrix/timeout/{id}")
+     String timeout(@PathVariable("id")Integer id);
+}
+
+@Component
+public class PaymentFallBackService implements PaymentHystrixService{
+   @Override
+   public String ok(Integer id) {
+      return "FallBackService: Current service encountered an unexpected exception or the related services are hectic. Please invoke later.";
+   }
+   @Override
+   public String timeout(Integer id) {
+      return "FallBackService : Current service encountered an unexpected exception or the related services are hectic. Please invoke later.";
+   }
+}
+```
 
 
+## Circuit Breaker
+The relationship between Circuit Breaker and Service Fallback is subtle. Circuit Breaker can be viewed as a special service fallback.
+Theoretically, service fallback emerges too much times and too often will cause circuit breaker.
 
+```java
+@Service
+public class PaymentService {
+    @HystrixCommand(commandProperties = {
+            @HystrixProperty(name = "circuitBreaker.enabled",value = "true"),
+            @HystrixProperty(name = "circuitBreaker.requestVolumeThreshold",value = "10"),
+            @HystrixProperty(name = "circuitBreaker.sleepWindowInMilliseconds",value = "10000"),
+            @HystrixProperty(name = "circuitBreaker.errorThresholdPercentage",value = "60")
+    })
+    /**
+     * These four annotations indicates that, 
+     * if 60% of 10 incoming requests fall backs in 10 seconds, circuit breaker will open
+     */
+    public String paymentCircuitBreaker(Integer id){
+        if(id<0){
+            throw new RuntimeException("id must be grater than 0.");
+        }
+        String serialNo = IdUtil.simpleUUID();
+        return "Invoke succeed, serial Number is "+serialNo;
+    }
+    
+}
+```
 
+## Hystrix Dashboard
+Hystrix also provide a dashboard for us to monitor service states conveniently.
+The dashboard will automatically monitor service states in near real time. We have to set up configurations to enable Hystrix Dashboard.
+```java
+@SpringBootApplication
+@EnableHystrixDashboard
+public class HystrixDashboardApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(HystrixDashboardApplication.class,args);
+    }
+}
+```
+The blow configuration is required in cloud-project-payment-hystrix.
+```java
+@Configuration
+public class HystrixConfig {
 
-# Spring Cloud Netflix Hystrix
+    /**
+     * Required configuration if you want to use Hystrix Dashboard to monitor this microservice
+     * seems like a system bug in spring cloud
+     * @return ServletRegistrationBean
+     */
+    @Bean
+    public ServletRegistrationBean getServlet(){
+        HystrixMetricsStreamServlet streamServlet = new HystrixMetricsStreamServlet();
+        ServletRegistrationBean registrationBean = new ServletRegistrationBean(streamServlet);
+        registrationBean.setLoadOnStartup(1);
+        registrationBean.addUrlMappings("/actuator/hystrix.stream");
+        registrationBean.setName("hystrix.stream");
+        return registrationBean;
+    }
+}
+```
+```yaml
+hystrix:
+  dashboard:
+    proxy-stream-allow-list: '*'
+    
+management:
+  endpoints:
+    web: #expose web endpoint to let hystrix dashboard to monitor
+      base-path: /
+      exposure:
+        include: '*'
+```
+
+Now, visit http://localhost:9001/hystrix. You will view this website.
+![img.png](docs/imgs/hystrix-dashboard.png)
+Input the exposed web endpoint(http://localhost:8001/hystrix.stream), input default delay 2000ms, input title. Then you will view Hystrix Dashboard.
+![img.png](docs/imgs/hystrix-dashboard-2.png)
+
 # Spring Cloud Gateway
+Three critical components of Gateway are Routes, Predicates and Filters.
+
+| Module Name           | service name          | port |
+|-----------------------|-----------------------|------|
+| cloud-gateway         | cloud-gateway         | 9527 |
+| cloud-project-payment | cloud-payment-service | 8001 |
+
+There are dozens of property configurations. View full details on [Spring Cloud Gateway Documentation](https://docs.spring.io/spring-cloud-gateway/docs/3.0.8/reference/html/#gateway-request-predicates-factories).
+
+```yaml
+spring:
+  application:
+    name: cloud-gateway
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true #create dynamic routes through eureka server
+      routes:
+        - id: payment_routh #route's ID, no fixed rule, ID should be unique, suggest use service name as prefix
+#          uri: http://localhost:8001
+          uri: lb://cloud-payment-service
+          predicates:
+            - Path=/payment/get/**
+        - id: payment_routh2
+#          uri: http://localhost:8001
+          uri: lb://cloud-payment-service
+          predicates:
+            - Path=/payment/create/**
+#            - After=2023-12-28T14:43:46.917+08:00[Asia/Shanghai]
+#            - Before=2023-12-28T14:43:46.917+08:00[Asia/Shanghai]
+#            - Between=2023-12-28T14:43:46.917+08:00[Asia/Shanghai],2023-12-29T14:43:46.917+08:00[Asia/Shanghai]
+#            - Cookie=key,value
+#            - Header=X-request-Id, \d+ #first param is header name, second param is reg expression
+#            - Host=**.somehost.org,**.anotherhost.org
+#            - Method=GET,POST #this route matches if the request method was a GET or a POST
+#            - Query=red, gree.  #The  route matches if the request contained a red query parameter whose value matched the gree. regexp, so green and greet would match.
+#            - RemoteAddr=192.168.1.1/24 #This route matches if the remote address of the request was, for example, 192.168.1.10.
+
+#          This route would forward ~80% of traffic to weighthigh.org and ~20% of traffic to weighlow.org
+#            routes:
+#              - id: weight_high
+#                uri: https://weighthigh.org
+#                predicates:
+#                  - Weight=group1, 8
+#              - id: weight_low
+#                uri: https://weightlow.org
+#                predicates:
+#                  - Weight=group1, 2
+```
+
 # Spring Cloud Config
+Spring Cloud Config provides a centralized config repository for microservice applications. The default config repo is GitHub.
+
+You need to install Rabbit MQ in your local enc and run it before moving on.
+
+
+| Module Name                | service name  | port |
+|----------------------------|---------------|------|
+| cloud-config-server        | config-server | 3344 |
+| cloud-config-client        | config-client | 3355 |
+| cloud-config-client-backup | config-client | 3366 |
+
 ## Config Server
+
+```yaml
+spring:
+  application:
+    name: config-server
+  cloud:
+    config:
+      server:
+        git: #indicates load properties from cloud2023 folder in my another repository(config-repo)
+          uri: https://github.com/FortuneWang95/config-repo.git
+          search-paths:
+            - cloud2023
+          label: master
+```
+
+![img.png](docs/imgs/config-repo-git.png)
+
+```java
+@SpringBootApplication
+@EnableConfigServer
+public class ConfigServerApplication {
+    public static void main( String[] args ) {
+        SpringApplication.run(ConfigServerApplication.class,args);
+    }
+}
+```
+
 ## Config Client
+**Notice : we need to replace application.yml with bootstrap.yml, because bootstrap.yml has higher priority.**
+
+```yaml
+spring:
+  application:
+    name: config-client
+  cloud:
+    config:
+      label: master #branch name
+      name: config-client #name of config file
+      profile: dev #suffix of config file, config-client-dev.yml/.properties in master branch will be loaded
+      uri: http://localhost:3344
+```
+
+```java
+@RestController
+@RefreshScope //this annotation is required in later session: Spring Cloud Bus
+public class ConfigClientController {
+    //according to yaml config, this value will be loaded from config-client-dev.properties in master label
+    @Value("${config.profile.version}")
+    private String profile;
+    @GetMapping("/profile/version")
+    public String getProfile(){
+        return profile;
+    }
+}
+
+```
+
+# Spring Cloud Bus
+Now git repository restores configuration files. Config Client loads properties through Config Server, Config Server loads properties from git repository. 
+A new problem emerges. What if we modify the config in git repository, how to broadcast modification to all related config clients?
+
+Then Spring Cloud Bus emerges. Spring Cloud Bus links Config Server and Config Clients. We expose a web endpoint on Config Server. 
+After modification in git repo, we call this web endpoint (localhost:3344/actuator/bus-refresh) manually, then Config Server will broadcast modification to Config Clients via message queue.
+
+```yaml
+rabbitmq:
+  host: localhost
+  port: 5672
+  username: guest
+  password: guest
+
+#expose an endpoint for bus refresh
+management:
+  endpoints:
+    web:
+      exposure:
+        include: 'bus-refresh'
+```
+
 # Spring Cloud Stream
+There are four message queues widely used in software development. They are Kafka, Rabbit MQ, Rabbit MQ and Active MQ. It's a disaster for developers to learn how to use four mqs.
+
+Then Spring Cloud Stream emerges. It provides out-of-box usage, isolates the gap between various MQs. But it only supports Kafka and RabbitMQ right now.
+
+
+| Module Name                  | service name           | port |
+|------------------------------|------------------------|------|
+| cloud-stream-publisher       | cloud-stream-publisher | 8801 |
+| cloud-stream-receiver        | config-stream-receiver | 8802 |
+| cloud-stream-receiver-backup | config-stream-receiver | 8803 |
+
 ## Message Publisher
+![img.png](docs/imgs/spring-cloud-stream-architecture.png)
+```yaml
+spring:
+  application:
+    name: cloud-stream-publisher
+  cloud:
+    stream:
+      binders:
+        defaultRabbit:
+          type: rabbit
+          environment:
+            spring:
+              rabbitmq:
+                host: localhost
+                port: 5672
+                username: guest
+                password: guest
+      bindings:
+        output: #means send message
+          destination: studyExchange
+          content-type: application/json
+          binder: defaultRabbit
+```
+```java
+@EnableBinding(Source.class)
+@Slf4j
+public class MessageProviderImpl implements MessageProvider{
+    @Autowired
+    private MessageChannel output;
+
+    @Override
+    public void send() {
+        String uuid = UUID.randomUUID().toString();
+        Message<String> message = MessageBuilder.withPayload(uuid).build();
+        output.send(message);
+        log.info("*********** Sent message : "+uuid);
+    }
+}
+```
 ## Message Receiver
+```yaml
+spring:
+  application:
+    name: cloud-stream-receiver
+  cloud:
+    stream:
+      binders:
+        defaultRabbit:
+          type: rabbit
+          environment:
+            spring:
+              rabbitmq:
+                host: localhost
+                port: 5672
+                username: guest
+                password: guest
+      bindings:
+        input: #means receive message
+          destination: studyExchange
+          content-type: application/json
+          binder: defaultRabbit
+          group: groupA # message receiver instances in the same group are competing with each other, only one message receiver instance can receive one message at one time
+```
+
+```java
+@Component
+@EnableBinding(Sink.class)
+@Slf4j
+public class MessageListener {
+    @Value("${server.port}")
+    private String port;
+    @StreamListener(Sink.INPUT)
+    public void receive(Message<String> message){
+        log.info("Message Recevier from port "+port+" recevied mesage : "+message);
+    }
+}
+```
 
 
 
