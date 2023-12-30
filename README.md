@@ -69,6 +69,26 @@ The bold items are used in this project. You may notice that Spring Cloud Alibab
 #  Netflix Eureka
 You only need to run involved modules. Run servers first then clients.
 
+```mermaid
+---
+title: Eureka Architectures
+---
+flowchart TB
+    server1[Eureka-Server:7001]
+    server2[Eureka-Server:7002]
+    subgraph server
+        direction LR
+        server1 ---|registers each other| server2
+    end
+    payment[Cloud-Payment-Service:8001]
+    order[Cloud-Order-Service:80]
+    subgraph client
+        direction LR
+        payment ---|knows each other| order
+    end
+    server -->|register| client      
+```
+
 ## Eureka Server 
 There are two eureka server instances, each of them point to each other. Two instances work together, one crashes, another still can work.
 
@@ -139,6 +159,32 @@ Modify property `eureka.instance.insatnce-id` will impact how to display in eure
 
 # Netflix Ribbon 
 Before moving on, make sure you have already run eureka servers. Run these modules as below.
+
+```mermaid
+---
+title: Ribbon Architectures
+---
+flowchart TB
+    server1[Eureka-Server:7001]
+    server2[Eureka-Server:7002]
+    subgraph server
+        direction LR
+        server1 ---|registers each other| server2
+    end
+    payment[Cloud-Payment-Service:8001]
+    paymentBP[Cloud-Payment-Service:8002]
+    order[Cloud-Order-Service:80]
+    subgraph provider
+        direction TB
+        payment --- paymentBP
+    end
+    subgraph client
+        direction LR
+        order --->|call| provider
+    end
+    server -->|register| client      
+```
+
 
 | Module Name                  | Service Provider/Consumer | service name          | port |
 |------------------------------|---------------------------|-----------------------|------|
@@ -279,6 +325,33 @@ public class OrderController {
 }
 ```
 
+
+```mermaid
+---
+title: OpenFeign Architectures
+---
+flowchart TB
+    server1[Eureka-Server:7001]
+    server2[Eureka-Server:7002]
+    subgraph server
+        direction LR
+        server1 ---|registers each other| server2
+    end
+    payment[Cloud-Payment-Service:8001]
+    paymentBP[Cloud-Payment-Service:8002]
+    order[Cloud-Order-Service:80]
+    subgraph provider
+        direction TB
+        payment --- paymentBP
+    end
+    subgraph client
+        direction LR
+        order --->|call| provider
+    end
+    server -->|register| client      
+```
+
+
 | Module Name                  | Service Provider/Consumer | service name          | port |
 |------------------------------|---------------------------|-----------------------|------|
 | cloud-project-order-feign    | Service Consumer          | cloud-order-service   | 80   |
@@ -340,6 +413,29 @@ logging:
 The features of Hystrix are Service Fallback and Circuit Breaker.
 
 **Notice:eureka server instances are required to be in running state before moving on.**
+
+
+```mermaid
+---
+title: Hystrix Architectures
+---
+flowchart TB
+    server1[Eureka-Server:7001]
+    server2[Eureka-Server:7002]
+    subgraph server
+        direction LR
+        server1 ---|registers each other| server2
+    end
+    payment[Cloud-Payment-Service:8001]
+    order[Cloud-Order-Service:80]
+    dashbaord[Hystrix-Dashboard:9001]
+    subgraph client
+        direction LR
+        order --->|call| payment
+    end  
+    server -->|register| client
+    dashbaord --->|monitor| client    
+```
 
 | Module Name                   | Service Provider/Consumer | service name                | port |
 |-------------------------------|---------------------------|-----------------------------|------|
@@ -529,6 +625,27 @@ Input the exposed web endpoint(http://localhost:8001/hystrix.stream), input defa
 # Spring Cloud Gateway
 Three critical components of Gateway are Routes, Predicates and Filters.
 
+```mermaid
+---
+title: Gateway Architectures
+---
+flowchart TB
+    server1[Eureka-Server:7001]
+    server2[Eureka-Server:7002]
+    subgraph server
+        direction LR
+        server1 ---|registers each other| server2
+    end
+    payment[Cloud-Payment-Service:8001]
+    gateway[Cloud-Gateway:9527]   
+    subgraph client
+        direction LR
+        gateway --->|route| payment
+    end  
+    server -->|register| client  
+```
+
+
 | Module Name           | service name          | port |
 |-----------------------|-----------------------|------|
 | cloud-gateway         | cloud-gateway         | 9527 |
@@ -582,6 +699,30 @@ spring:
 Spring Cloud Config provides a centralized config repository for microservice applications. The default config repo is GitHub.
 
 You need to install Rabbit MQ in your local enc and run it before moving on.
+
+```mermaid
+---
+title: Cloud Config Architectures
+---
+flowchart TB
+    server1[Eureka-Server:7001]
+    server2[Eureka-Server:7002]
+    subgraph eurekaServer
+        direction LR
+        server1 ---|registers each other| server2
+    end
+    configServer[config-server:3344]
+    client[config-client:3355]
+    client2[config-client:3366]
+    git[Git Repository]
+    subgraph eurekaClient
+        subgraph configClient
+            client---client2
+        end
+      configClient --->|load Properties|configServer --->|load Properties|git  
+    end
+    eurekaServer -->|register| eurekaClient  
+```
 
 
 | Module Name                | service name  | port |
@@ -655,6 +796,16 @@ A new problem emerges. What if we modify the config in git repository, how to br
 Then Spring Cloud Bus emerges. Spring Cloud Bus links Config Server and Config Clients. We expose a web endpoint on Config Server. 
 After modification in git repo, we call this web endpoint (localhost:3344/actuator/bus-refresh) manually, then Config Server will broadcast modification to Config Clients via message queue.
 
+```mermaid
+---
+title: Cloud Bus Architectures
+---
+flowchart LR
+    configClient --->|load Properties|configServer --->|load Properties|git
+    browser--->|call|configServer--->|Send Message|bus--->|Boradcast Modification|configClient        
+```
+
+
 ```yaml
 rabbitmq:
   host: localhost
@@ -675,12 +826,37 @@ There are four message queues widely used in software development. They are Kafk
 
 Then Spring Cloud Stream emerges. It provides out-of-box usage, isolates the gap between various MQs. But it only supports Kafka and RabbitMQ right now.
 
+```mermaid
+---
+title: Cloud Stream Architectures
+---
+flowchart TB
+    server1[Eureka-Server:7001]
+    server2[Eureka-Server:7002]
+    subgraph eurekaServer
+        direction LR
+        server1 ---|registers each other| server2
+    end
+    provider[cloud-stream-publisher:8801]
+    receiver[cloud-stream-receiver:8802]
+    receiver2[cloud-stream-receiver:8803]
+    subgraph eurekaClient
+        subgraph receivers
+            receiver---|competing|receiver2
+        end
+        provider--->|publish message|MQ
+        receivers--->|subscribe|MQ
+    end
+    eurekaServer -->|register| eurekaClient  
+```
+
+
 
 | Module Name                  | service name           | port |
 |------------------------------|------------------------|------|
 | cloud-stream-publisher       | cloud-stream-publisher | 8801 |
-| cloud-stream-receiver        | config-stream-receiver | 8802 |
-| cloud-stream-receiver-backup | config-stream-receiver | 8803 |
+| cloud-stream-receiver        | cloud-stream-receiver | 8802 |
+| cloud-stream-receiver-backup | cloud-stream-receiver | 8803 |
 
 ## Message Publisher
 ![img.png](docs/imgs/spring-cloud-stream-architecture.png)
